@@ -1,8 +1,4 @@
-"""CPU functionality."""
-
 import sys
-
-
 program = []
 
 
@@ -11,14 +7,21 @@ class CPU:
 
     def __init__(self):
         """Construct a new CPU."""
-        self.ram = [0] * 256  # creates ram with 256 bytes of memory
-        self.pc = 0  # our counter
+        self.ram = [0] * 256  # create ram with 256 bytes of memory
         self.reg = [0] * 8  # general registry with 8 slots
-        self.instructions = {"LDI": 0b10000010,
-                             "HLT": 0b00000001,
-                             "PRN": 0b01000111,
-                             "MUL": 0b10100010,
-                             }  # instruction code link with short name for development sake
+        self.pc = 0
+        self.instructions = {
+            "LDI": 0b10000010,
+            "HLT": 0b00000001,
+            "PRN": 0b01000111,
+            "MUL": 0b10100010,
+            "ADD": 0b10100000,
+            "SUB": 0b10100001,
+            "POP": 0b01000110,
+            "PUSH": 0b01000101,
+        }
+        self.SP = 7
+        self.reg[7] = 0xf4
 
     def load(self):
         """Load a program into memory."""
@@ -44,7 +47,13 @@ class CPU:
 
         if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
-        # elif op == "SUB": etc
+            self.pc += 3
+        elif op == "SUB":
+            self.reg[reg_a] -= self.reg[reg_b]
+            self.pc += 3
+        elif op == "MUL":
+            self.reg[reg_a] *= self.reg[reg_b]
+            self.pc += 3
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -56,8 +65,6 @@ class CPU:
 
         print(f"TRACE: %02X | %02X %02X %02X |" % (
             self.pc,
-            # self.fl,
-            # self.ie,
             self.ram_read(self.pc),
             self.ram_read(self.pc + 1),
             self.ram_read(self.pc + 2)
@@ -68,34 +75,56 @@ class CPU:
 
         print()
 
-    def ram_read(self, ma):
-        # ma = Memory Access
+    def ram_read(self, ma):  # ma = Memory Access
         return self.ram[ma]
 
-    def ram_write(self, ma, v):
-        # v = value
+    def ram_write(self, ma, v):  # v = value
         self.ram[ma] = v
 
     def run(self):
         """Run the CPU."""
         running = True
-
         while running:
-            IR = self.ram_read(self.pc)
+            ir = self.ram_read(self.pc)
             operand_a = self.ram_read(self.pc + 1)
             operand_b = self.ram_read(self.pc + 2)
-            if IR == self.instructions["HLT"]:
+
+            if ir == self.instructions["HLT"]:
                 running = False
                 self.pc += 1
-            elif IR == self.instructions["LDI"]:
+
+            elif ir == self.instructions["LDI"]:
                 self.reg[operand_a] = operand_b
                 self.pc += 3
-            elif IR == self.instructions["PRN"]:
+
+            elif ir == self.instructions["PRN"]:
                 print(self.reg[operand_a])
                 self.pc += 2
-            elif IR == self.instructions["MUL"]:
-                self.reg[operand_a] *= self.reg[operand_b]
-                self.pc += 3
+
+            elif ir == self.instructions["MUL"]:
+                self.alu("MUL", operand_a, operand_b)
+            elif ir == self.instructions["ADD"]:
+                self.alu("ADD", operand_a, operand_b)
+            elif ir == self.instructions["SUB"]:
+                self.alu("SUB", operand_a, operand_b)
+
+            elif ir == self.instructions["PUSH"]:
+                # decrement the stack pointer
+                self.reg[self.SP] -= 1
+                # copy the value from register into memory
+                reg_num = self.ram[self.pc+1]
+                value = self.reg[reg_num]  # this is what should be pushed
+                address = self.reg[self.SP]
+                # store the value on the stack
+                self.ram[address] = value
+                self.pc += 2
+            elif ir == self.instructions["POP"]:
+                # copy the value from the address pointed to by 'SP', to the given register
+                value = self.ram_read(self.reg[self.SP])
+                self.reg[operand_a] = value
+                # increment the stack pointer
+                self.reg[self.SP] += 1
+                self.pc += 2
             else:
-                print(f"Instruction unkown")
+                print("unknown instruction")
                 running = False
