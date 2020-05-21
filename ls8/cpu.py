@@ -19,6 +19,8 @@ class CPU:
             "SUB": 0b10100001,
             "POP": 0b01000110,
             "PUSH": 0b01000101,
+            "CALL": 0b01010000,
+            "RET": 0b00010001
         }
         self.SP = 7
         self.reg[7] = 0xf4
@@ -36,8 +38,6 @@ class CPU:
                         continue
                     line = int(line, 2)
                     program.append(line)
-        else:
-            return
         for instruction in program:
             self.ram[address] = instruction
             address += 1
@@ -125,6 +125,19 @@ class CPU:
                 # increment the stack pointer
                 self.reg[self.SP] += 1
                 self.pc += 2
+            elif ir == self.instructions["CALL"]:
+                ret_add = self.pc + 2
+                self.reg[self.SP] -= 1
+                self.ram[self.reg[self.SP]] = ret_add
+                reg_num = self.ram[self.pc + 1]
+                dest_add = self.reg[reg_num]
+
+                self.pc = dest_add
+            elif ir == self.instructions["RET"]:
+                ret_add = self.ram[self.reg[self.SP]]
+                self.reg[self.SP] += 1
+
+                self.pc = ret_add
             else:
                 print("unknown instruction")
                 running = False
