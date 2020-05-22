@@ -10,6 +10,8 @@ class CPU:
         self.ram = [0] * 256  # create ram with 256 bytes of memory
         self.reg = [0] * 8  # general registry with 8 slots
         self.pc = 0
+        self.fl = 0b00000000
+
         self.instructions = {
             "LDI": 0b10000010,
             "HLT": 0b00000001,
@@ -20,7 +22,15 @@ class CPU:
             "POP": 0b01000110,
             "PUSH": 0b01000101,
             "CALL": 0b01010000,
-            "RET": 0b00010001
+            "RET": 0b00010001,
+            "DIV": 0b10100011,
+            "JMP": 0b01010100,
+            "CMP": 0b10100111,
+            "JEQ": 0b01010101,
+            "JNE": 0b01010110,
+            "PUSH": 0b01000101,
+            "CALL": 0b01010000,
+
         }
         self.SP = 7
         self.reg[7] = 0xf4
@@ -53,6 +63,17 @@ class CPU:
             self.pc += 3
         elif op == "MUL":
             self.reg[reg_a] *= self.reg[reg_b]
+            self.pc += 3
+        elif op == "CMP":
+            if self.reg[reg_a] < self.reg[reg_b]:
+                self.fl = 0b00000100
+            elif self.reg[reg_a] > self.reg[reg_b]:
+                self.fl = 0b00000010
+            elif self.reg[reg_a] == self.reg[reg_b]:
+                self.fl = 0b00000001
+            else:
+                self.fl = 0b00000000
+
             self.pc += 3
         else:
             raise Exception("Unsupported ALU operation")
@@ -103,8 +124,10 @@ class CPU:
 
             elif ir == self.instructions["MUL"]:
                 self.alu("MUL", operand_a, operand_b)
+
             elif ir == self.instructions["ADD"]:
                 self.alu("ADD", operand_a, operand_b)
+
             elif ir == self.instructions["SUB"]:
                 self.alu("SUB", operand_a, operand_b)
 
@@ -118,6 +141,7 @@ class CPU:
                 # store the value on the stack
                 self.ram[address] = value
                 self.pc += 2
+
             elif ir == self.instructions["POP"]:
                 # copy the value from the address pointed to by 'SP', to the given register
                 value = self.ram_read(self.reg[self.SP])
@@ -125,19 +149,39 @@ class CPU:
                 # increment the stack pointer
                 self.reg[self.SP] += 1
                 self.pc += 2
+
             elif ir == self.instructions["CALL"]:
+                # set return address
+                # decrement stack pointer
                 ret_add = self.pc + 2
                 self.reg[self.SP] -= 1
                 self.ram[self.reg[self.SP]] = ret_add
+                # set pc to the value stored in the provided register
                 reg_num = self.ram[self.pc + 1]
                 dest_add = self.reg[reg_num]
 
                 self.pc = dest_add
             elif ir == self.instructions["RET"]:
+                # pop the return address from the top of the stack
+                # then set the pc
                 ret_add = self.ram[self.reg[self.SP]]
                 self.reg[self.SP] += 1
 
                 self.pc = ret_add
+            elif ir == self.instructions["CMP"]:
+                self.alu("CMP", operand_a, operand_b)
+            elif ir == self.instructions["JMP"]:
+                self.pc = self.reg[operand_a]
+            elif ir == self.instructions["JEQ"]:
+                if self.fl == 0b00000001:
+                    self.pc = self.reg[operand_a]
+                else:
+                    self.pc += 2
+            elif ir == self.instructions["JNE"]:
+                if self.fl & 0b00000001 == 0:
+                    self.pc = self.reg[operand_a]
+                else:
+                    self.pc += 2
             else:
                 print("unknown instruction")
                 running = False
